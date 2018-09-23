@@ -1,0 +1,6 @@
+---
+bootstrap_os: coreos
+
+bootstrap_pip_python_modules:
+  - docker-py
+  - boto

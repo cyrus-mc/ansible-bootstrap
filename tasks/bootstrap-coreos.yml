@@ -1,0 +1,64 @@
+---
+- name: check if bootstrap is needed
+  raw: stat /opt/bin/.bootstrapped
+  register: need_bootstrap
+  failed_when: false
+  changed_when: false
+  tags:
+    - facts
+
+- name: set binary directory
+  set_fact:
+    bin_dir: "/opt/bin"
+  tags:
+    - facts
+
+- name: run bootstrap script
+  script: bootstrap.sh
+  when: need_bootstrap.rc != 0
+
+- set_fact:
+    ansible_python_interpreter: "{{ bin_dir }}/python"
+  tags:
+    - facts
+
+- name: check if pip installed
+  shell: "pip --version"
+  register: need_pip
+  failed_when: false
+  changed_when: false
+  check_mode: no
+  tags:
+    - facts
+  environment:
+    PATH: "{{ ansible_env.PATH }}:{{ bin_dir }}"
+
+- name: copy get-pip.py script
+  copy:
+    src: get-pip.py
+    dest: ~/get-pip.py
+  when: need_pip.rc != 0
+
+- name: install pip
+  shell: "{{ansible_python_interpreter}} ~/get-pip.py"
+  when: need_pip.rc != 0
+
+- name: remove get-pip.py script
+  file:
+    path: ~/get-pip.py
+    state: absent
+  when: need_pip.rc != 0
+
+- name: install pip launcher script
+  copy:
+    src: runner
+    dest: "{{ bin_dir }}/pip"
+    mode: 0755
+  when: need_pip.rc != 0
+
+- name: install required python modules
+  pip:
+    name: "{{ item }}"
+  with_items: "{{ bootstrap_pip_python_modules }}"
+  environment:
+    PATH: "{{ ansible_env.PATH }}:{{ bin_dir }}"
